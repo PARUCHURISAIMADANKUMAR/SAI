@@ -3,6 +3,14 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
+from io import BytesIO
+from datetime import datetime
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
 
 # ============================================================
@@ -1345,6 +1353,200 @@ if portfolio_stocks and abs(total_weight - 100) <= 0.01:
         portfolio_chart,
         width="stretch"
     )
+
+# ============================================================
+# DOWNLOADABLE PDF INVESTMENT REPORT
+# ============================================================
+
+def create_investment_pdf():
+    """Create a downloadable PDF report from the current dashboard analysis."""
+    buffer = BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=0.65 * inch,
+        leftMargin=0.65 * inch,
+        topMargin=0.65 * inch,
+        bottomMargin=0.65 * inch
+    )
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="ReportTitle",
+        parent=styles["Title"],
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#17365D"),
+        fontSize=18,
+        leading=22,
+        spaceAfter=8
+    ))
+    styles.add(ParagraphStyle(
+        name="SectionHeading",
+        parent=styles["Heading2"],
+        textColor=colors.HexColor("#17365D"),
+        spaceBefore=10,
+        spaceAfter=6
+    ))
+    styles.add(ParagraphStyle(
+        name="ReportBody",
+        parent=styles["BodyText"],
+        fontSize=9,
+        leading=13,
+        spaceAfter=5
+    ))
+
+    story = [
+        Paragraph("INVESTMENT RECOMMENDATION SYSTEM", styles["ReportTitle"]),
+        Paragraph("Historical Stock and Portfolio Analysis Report", styles["Heading2"]),
+        Paragraph(
+            f"Generated on: {datetime.now().strftime('%d %B %Y, %I:%M %p')}",
+            styles["ReportBody"]
+        ),
+        Spacer(1, 8),
+        Paragraph("1. Selected Stock Overview", styles["SectionHeading"])
+    ]
+
+    overview_rows = [
+        ["Metric", "Value"],
+        ["Stock", str(selected_stock)],
+        ["Ticker", str(ticker)],
+        ["Starting price", f"INR {starting_price:,.2f}"],
+        ["Latest available price", f"INR {ending_price:,.2f}"],
+        ["Historical total return", f"{total_return * 100:.2f}%"],
+        ["Daily volatility", f"{daily_volatility * 100:.2f}%"],
+        ["Annualized volatility", f"{annualized_volatility * 100:.2f}%"],
+        ["Maximum drawdown", f"{maximum_drawdown * 100:.2f}%"],
+    ]
+    overview_table = Table(overview_rows, colWidths=[2.7 * inch, 3.7 * inch], repeatRows=1)
+    overview_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17365D")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#C9D3E0")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F3F6FA")]),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("PADDING", (0, 0), (-1, -1), 6),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.extend([overview_table, Spacer(1, 8)])
+
+    story.append(Paragraph("2. Investment Score and Recommendation", styles["SectionHeading"]))
+    score_rows = [
+        ["Metric", "Value"],
+        ["Return score", str(return_score)],
+        ["Trend score", str(trend_score)],
+        ["Volatility score", str(volatility_score)],
+        ["Drawdown score", str(drawdown_score)],
+        ["Risk score", str(risk_score)],
+        ["Normalized risk score", f"{normalized_risk_score:.2f}"],
+        ["Investment score", f"{investment_score:.2f}"],
+        ["System recommendation", recommendation],
+    ]
+    score_table = Table(score_rows, colWidths=[2.7 * inch, 3.7 * inch], repeatRows=1)
+    score_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17365D")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#C9D3E0")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F3F6FA")]),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.extend([score_table, Spacer(1, 8)])
+
+    story.append(Paragraph("3. Stock Comparison", styles["SectionHeading"]))
+    if comparison_results:
+        comp_rows = [[
+            "Stock", "Return (%)", "Volatility (%)", "Drawdown (%)",
+            "Investment score", "Recommendation"
+        ]]
+        for item in comparison_results:
+            comp_rows.append([
+                str(item["Stock"]),
+                f'{item["Total Return"]:.2f}',
+                f'{item["Annualized Volatility"]:.2f}',
+                f'{item["Maximum Drawdown"]:.2f}',
+                f'{item["Investment Score"]:.2f}',
+                str(item["Recommendation"])
+            ])
+        comp_table = Table(
+            comp_rows,
+            colWidths=[1.15 * inch, 0.85 * inch, 1.0 * inch, 0.9 * inch, 1.0 * inch, 1.1 * inch],
+            repeatRows=1
+        )
+        comp_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17365D")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#C9D3E0")),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("PADDING", (0, 0), (-1, -1), 5),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        story.extend([comp_table, Spacer(1, 8)])
+    else:
+        story.append(Paragraph("Stock comparison data was not available during report generation.", styles["ReportBody"]))
+
+    story.append(Paragraph("4. Portfolio Analysis", styles["SectionHeading"]))
+    if portfolio_stocks and "portfolio_total_return" in globals() and abs(total_weight - 100) <= 0.01:
+        portfolio_rows = [
+            ["Portfolio metric", "Value"],
+            ["Selected stocks", ", ".join(portfolio_stocks)],
+            ["Portfolio weights", ", ".join(
+                f"{name}: {portfolio_weights[name]:.2f}%" for name in portfolio_stocks
+            )],
+            ["Portfolio total return", f"{portfolio_total_return * 100:.2f}%"],
+            ["Annualized volatility", f"{portfolio_annualized_volatility * 100:.2f}%"],
+            ["Maximum drawdown", f"{portfolio_max_drawdown * 100:.2f}%"],
+        ]
+        portfolio_table = Table(portfolio_rows, colWidths=[2.7 * inch, 3.7 * inch], repeatRows=1)
+        portfolio_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#17365D")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#C9D3E0")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F3F6FA")]),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("PADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.extend([portfolio_table, Spacer(1, 8)])
+    else:
+        story.append(Paragraph(
+            "Portfolio metrics are omitted because no portfolio was selected with valid weights totaling 100%.",
+            styles["ReportBody"]
+        ))
+
+    story.append(Paragraph("5. Methodology and Disclaimer", styles["SectionHeading"]))
+    story.append(Paragraph(
+        "The dashboard evaluates historical return, trend, annualized volatility and maximum drawdown. "
+        "The project-defined investment score is calculated as 40% return score + 30% trend score + "
+        "30% normalized risk score. Scores of 0.50 or above are labelled BUY; scores of -0.50 or below "
+        "are labelled SELL; other scores are labelled HOLD.",
+        styles["ReportBody"]
+    ))
+    story.append(Paragraph(
+        "This report is for academic and analytical purposes only. It uses historical market data, "
+        "which may be incomplete or delayed, and does not constitute financial advice or a guarantee "
+        "of future performance. Please conduct independent research before making investment decisions.",
+        styles["ReportBody"]
+    ))
+
+    document.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+st.subheader("📄 Download Investment Report")
+st.write("Download the current stock analysis, recommendation, stock comparison and valid portfolio metrics as a PDF.")
+pdf_report = create_investment_pdf()
+st.download_button(
+    label="📥 Download PDF Investment Report",
+    data=pdf_report,
+    file_name=f"investment_report_{selected_stock.replace(' ', '_').lower()}.pdf",
+    mime="application/pdf",
+    key="download_pdf_investment_report"
+)
+
 # ============================================================
 # FOOTER
 # ============================================================
